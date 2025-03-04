@@ -1,0 +1,7 @@
+fts-rest-whoami -s "https://fts-egi.cern.ch:8446" --fts-access-token=$ildg
+
+fts-rest-transfer-submit -s "https://fts-egi.cern.ch:8446" https://globe-door.ifh.de:2880/pnfs/ifh.de/acs/grid/ildg/intertwin/test-file41 https://dcache-desy-webdav.desy.de:2880/pnfs/desy.de/ildg/intertwin/test-file41 --fts-access-token=$ildg --src-access-token=$ildg --dst-access-token=$ildg
+
+fts-rest-transfer-status -s "https://fts-egi.cern.ch:8446" <JOB_ID> --fts-access-token=$ildg
+
+fts-rest-transfer-cancel -s "https://fts-egi.cern.ch:8446" --fts-access-token=$ildg <JOB_ID>

@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+#  GET-token-demo -- get access token by device-code flow with shared client 
+#
+#
+#  Usage: GET-token-demo [<scopes>]
+#
+#  Documentation:
+#  - RFC 8628 "OAuth 2.0 Device Authorization Grant"
+#  - https://indigo-iam.github.io/v/v1.8.3/docs/tasks/user/getting-a-token/#obtaining-a-token-with-the-device-code-flow
+#  - https://indigo-iam.github.io/v/v1.8.3/docs/reference/configuration/jwt-profiles/
+#  - WLCG Common Profiles, https://zenodo.org/record/3460258
+#
+#  hs 24.2.2025
+######################################################################
+
+msg() {
+    echo "$@" 1>&2
+}
+
+# IAM endpoints
+IAM_HOSTNAME="https://iam-ildg.cloud.cnaf.infn.it"
+IAM_DEVICE_CODE_ENDPOINT="${IAM_HOSTNAME}/devicecode"
+IAM_TOKEN_ENDPOINT="${IAM_HOSTNAME}/token"
+
+# Client Credentials
+IAM_CLIENT_ID="14288680-2752-426d-935a-821691d6201f"
+IAM_CLIENT_SECRET="FAIeFM80e_bH43XWJUjaTZtOXFuqZx1hV8_MQ3gwhE9petA-P5stbiGxrNRXeY1L86AIiqtWM2-LJnGcAT1toQ"
+
+# Request Parameters
+IAM_CLIENT_AUDIENCE="https://wlcg.cern.ch/jwt/v1/any"
+IAM_CLIENT_SCOPES="profile openid wlcg.groups storage.stage:/intertwin/ storage.modify:/intertwin/ storage.create:/intertwin/ storage.read:/intertwin/"
+
+if [ $# -gt 0 ]
+then
+    IAM_CLIENT_SCOPES="$*"
+fi
+
+# Note: Add scope "openid" to also get ID token
+
+######################################################################
+### Get Device Code and URL for User Approval
+######################################################################
+msg "CLIENT: ${IAM_CLIENT_ID}"
+msg "SCOPES: ${IAM_CLIENT_SCOPES}"
+
+res0=`curl -s -L \
+           -u ${IAM_CLIENT_ID}:${IAM_CLIENT_SECRET} \
+           -d client_id=${IAM_CLIENT_ID} \
+           -d scope="${IAM_CLIENT_SCOPES}" \
+           ${IAM_DEVICE_CODE_ENDPOINT}`
+
+# Check errors
+echo $res0 | grep error > /dev/null
+if [ $? -eq 0 ]; then
+    msg "ERROR:"
+    msg "$(echo $res0 | jq .)"
+    exit
+else
+    msg "RESPONSE1:"
+    echo $res0 | jq . 1>&2
+fi
+
+# Extract URL for user approval and device code
+verification_uri_complete=`echo $res0 | jq -r .verification_uri_complete`
+msg "Please open the following URL in the browser and approve:"
+msg ""
+msg "${verification_uri_complete}"
+msg ""
+
+device_code=`echo $res0 | jq -r .device_code`
+
+######################################################################
+# Get Token (using device_code)
+######################################################################
+read -p "Continue ? "
+# Continuation WITHOUT previous approval yields
+# error             = "authorization_pending"
+# error_description = "Authorization pending for code: ..."
+
+if [ -n "${IAM_CLIENT_AUDIENCE}" ]
+then
+   opt_aud="-d audience=${IAM_CLIENT_AUDIENCE}"
+fi
+
+res1=`curl -q -L -s \
+           -u ${IAM_CLIENT_ID}:${IAM_CLIENT_SECRET} \
+           -d grant_type=urn:ietf:params:oauth:grant-type:device_code \
+           -d device_code=${device_code} \
+           ${opt_aud} -d scope="${IAM_CLIENT_SCOPES}" \
+           ${IAM_TOKEN_ENDPOINT}`
+
+# Check errors and show token
+echo $res1 | grep error > /dev/null
+if [ $? -eq 0 ]; then
+    msg "ERROR:"
+    echo $res1 | jq . 1>&2
+    exit
+else
+    msg "RESPONSE2:"
+    echo $res1 | jq . 1>&2
+    msg ""
+    at=`echo $res1 | jq .access_token`
+    msg "export BEARER_TOKEN=$at"
+    echo "BEARER_TOKEN=$at"
+    echo $at >> ~/.config/rclone/token
+    p=`echo $at | cut -d . -f 2`
+    while [ $(( ${#p} % 4 )) -ne 0 ]
+    do
+        p="$p="
+    done
+    echo $p | base64 -d | jq . 1>&2
+fi
