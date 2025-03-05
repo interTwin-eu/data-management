@@ -1,0 +1,9 @@
+To set the client secret as an environment variable (substituting <SECRET> with the actual client secret), enter:
+
+SECRET=<SECRET>
+
+After that, you can execute the GET-token-demo script by entering:
+eval `CLIENT_SECRET=$SECRET ./GET-token-demo`
+
+To set up the oidc-agent to use the ILDG IAM's public client, enter:
+CLIENT_SECRET=$SECRET ./oidc-public_client-conf.sh 
