@@ -17,4 +17,5 @@ COPY --chmod=770 GET-token-demo .
 COPY --chmod=770 oidc-public_client-conf.sh .
 COPY --chmod=770 ildg.sh .
 COPY list-of-fts-commands.txt .
+COPY README .
 COPY test-file .
